@@ -73,13 +73,6 @@ int main(int argc, char *argv[])
             printf("Server terminated or communication error. Exiting.\n");
             break;
         }
-
-        // Check if the received message indicates server termination
-        if (strcmp(msg, "police win") == 0)
-        {
-            printf("Police win! Game over.\n");
-            break;
-        }
     }
 
     // Close the client socket
