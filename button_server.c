@@ -10,7 +10,7 @@
 #include <sys/types.h>
 #include <stdbool.h>
 
-#include "../touch_lcd_server.h"
+#include "touch_lcd_server.h"
 
 #define IN 0
 #define OUT 1
@@ -27,8 +27,9 @@ bool server_ready_state = false;
 bool client_ready_state = false;
 bool stop_skill = true;
 bool chaos_skill = true;
-
-int game_start = 0;
+bool countdown_start = false;
+bool game_start = false;
+bool touched = false; //added
 
 static int GPIOExport(int pin) {
 #define BUFFER_MAX 3
@@ -145,14 +146,14 @@ void* thread_input_to_rc_clnt_socket(void* arg) {
 
     while (1) {
         //0.01초 마다 실행해야 하는 작업---------------------------------------------------
-        if (GPIORead(PIN) == 0 ) { //조이스틱 값이 변경되었을 때
+        if ( 조이스틱이 변경됨 ) { //조이스틱 값이 변경되었을 때
             write(rc_clnt_sock, "조이스틱 값", strlen("조이스틱 값"));
         }
-        if(stop_skill){
+        if( stop_skill 버튼이 눌림 ){
           write(rc_clnt_sock, "stop_skill", strlen("stop_skill"));
           stop_skill = false;
         }
-        if(chaos_skill){
+        if( chaos_skill 버튼이 눌림 ){
           write(rc_clnt_sock, "chaos_skill", strlen("chaos_skill"));
           chaos_skill = false;
         }
@@ -180,7 +181,7 @@ void* thread_input_to_rc_clnt_socket(void* arg) {
         
         //countdown이 0이면 game start
         if (!countdown) {
-            game_start = 1;
+            game_start = true;
             printf("Game Start!\n");
         }
 
@@ -196,7 +197,7 @@ void* thread_input_to_rc_clnt_socket(void* arg) {
                 print_str("s ");
 
                 // Check for touch sensor detection        
-                if (!digitalRead(PIR)) {       
+                if (!touched) {       
                     --time_limit;
                 }
 
@@ -211,10 +212,6 @@ void* thread_input_to_rc_clnt_socket(void* arg) {
                     lcd_m(LINE1);
                     print_str("Police win!");
 
-                    // Close client socket and exit
-                    close(clnt_sock);
-                    close(serv_sock);
-
                     detected = 1;
                     exit(0);
                 }
@@ -226,8 +223,11 @@ void* thread_input_to_rc_clnt_socket(void* arg) {
 
                 lcd_m(LINE1);
                 print_str("Theif win!");
+
+                detected = 0;
+                exit(0);
             }
-        }
+            }
         //1초 마다 실행해야 하는 작업------------------------------------------------------
         }
         
@@ -244,7 +244,7 @@ void* thread_rc_clnt_socket_to_output(void* arg) {
         if (valread > 0) {
           //rc카에서 읽어드린 값 
           if(strcmp(buffer,"터치센서건드림")){
-            //game over
+            
           }
         }
     }
@@ -261,7 +261,7 @@ void* thread_input_to_ctrl_clnt_socket(void* arg) {
 
         //0.1초마다
         if((centi_sec_counter%10)==0){
-            if (GPIORead(PIN) == 0) {
+            if (GPIORead(PIN) == 0) { //시작버튼 눌림
               server_ready_state = !server_ready_state;
               printf("server button state changed: %s\n", server_ready_state ? "true" : "false");
             }
@@ -320,6 +320,10 @@ void* thread_ctrl_clnt_socket_to_output(void* arg) {
           }
           if (strcmp(buffer, "client chaos skill button pressed") == 0) {
             //server모터 반대로
+            
+          }
+          if (strcmp(buffer, "touched") == 0) {
+            touched = true;
           }
         }
     }
