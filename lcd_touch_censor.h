@@ -38,12 +38,12 @@ int fd;
 void lcd_init(void);
 void lcd_byte(int bits, int mode);
 void lcd_toggle_enable(int bits);
-void lcd_m(int line); // 紐뉖쾲吏?以꾩뿉 異쒕젰?좎?
-void print_int(int i); // ?뺤닔 異쒕젰 肄붾뱶
-void cursor_to_home(void); // 而ㅼ꽌瑜????꾩튂濡??대룞
-void print_str(const char *s); // 臾몄옄??異쒕젰 肄붾뱶
-void get_set(void); // 以鍮??⑥닔
-void time_limit(void); // ?쒓컙 ?쒗븳
-void delay_f(void); // 吏???⑥닔
+void lcd_m(int line);
+void print_int(int i);
+void cursor_to_home(void);
+void print_str(const char *s);
+void get_set(void);
+void time_limit(void);
+void delay_f(void);
 
 #endif
