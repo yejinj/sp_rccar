@@ -35,13 +35,13 @@ int fd;
 void lcd_init(void);
 void lcd_byte(int bits, int mode);
 void lcd_toggle_enable(int bits);
-void lcd_m(int line);
-void print_int(int i);
-void cursor_to_home(void);
-void print_str(const char *s);
-void get_set(void);
-void time_limit(void);
-void delay_f(void);
+void lcd_m(int line); // 몇번째 줄에 출력할지
+void print_int(int i); // 정수 출력 코드
+void cursor_to_home(void); // 커서를 홈 위치로 이동
+void print_str(const char *s); // 문자열 출력 코드
+void get_set(void); // 준비 함수
+void time_limit(void); // 시간 제한
+void delay_f(void); // 지연 함수
 
 int main(int argc, char *argv[])
 {
@@ -122,8 +122,7 @@ int main(int argc, char *argv[])
     lcd_init();
     get_set();
 
-    int time_limit = 10;
-    // 시간제한 2분 = 120s
+    int time_limit = 120; // 2m
     
     int detected = 0;
 
@@ -152,7 +151,7 @@ int main(int argc, char *argv[])
             close(clnt_sock);
             close(serv_sock);
 
-            lcd_init();
+            lcd_m(LINE1);
             print_str("Police win!");
 
             for (int i = 0; i < 3; i++) {
@@ -168,11 +167,11 @@ int main(int argc, char *argv[])
     if (detected == 0) {
         write(clnt_sock, "Theif win!", sizeof("Theif win!"));
 
-        lcd_init();
+        lcd_m(LINE1);
         print_str("Theif win!");
-        delay_f();
-        delay_f();
-        delay_f();
+        for (int i = 0; i < 3; i++) {
+            delay_f();
+        }
     }
 
     return 0;
@@ -232,7 +231,6 @@ void time_limit(void) {
         cursor_to_home();
 
         print_str("Game Over!");
-
         for (int i = 0; i < 5; i++) {
             delay_f();
         }
