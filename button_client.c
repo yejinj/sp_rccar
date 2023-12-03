@@ -10,7 +10,7 @@
     #include <sys/types.h>
     #include <stdbool.h>
 
-    #include "../touch_lcd_server.h"
+    #include "touch_lcd_server.h"
 
     #define IN 0
     #define OUT 1
@@ -27,7 +27,9 @@
     bool stop_skill = true;
     bool chaos_skill = true;
 
-    int game_start = 0;
+
+    bool game_start = false;
+    bool touched = false;
 
     static int GPIOExport(int pin) {
         #define BUFFER_MAX 3
@@ -146,14 +148,14 @@
 
         while (1) {
             //0.01초 마다 실행해야 하는 작업---------------------------------------------------
-            if (GPIORead(PIN) == 0 ) { //조이스틱 값이 변경되었을 때
+            if ( 조이스틱이 변경됨 ) { //조이스틱 값이 변경되었을 때
             write(rc_clnt_sock, "조이스틱 값", strlen("조이스틱 값"));
             }
-            if(stop_skill){
+            if( stop_skill 버튼이 눌림 ){
             write(rc_clnt_sock, "stop_skill", strlen("stop_skill"));
             stop_skill = false;
             }
-            if(chaos_skill){
+            if( chaos_skill 버튼이 눌림 ){
             write(rc_clnt_sock, "chaos_skill", strlen("chaos_skill"));
             chaos_skill = false;
             }
@@ -185,6 +187,8 @@
             //rc카에서 읽어드린 값 
             if(strcmp(buffer,"터치센서건드림")){
                 //game over
+                touched = true;
+
             }
             }
         }
@@ -197,11 +201,15 @@
 
         while (1) {
             //0.01초 마다 실행해야 하는 작업---------------------------------------------------
+            if (touched) {
+                write(ctrl_clnt_socket, "touched", strlen("touched"));
+            }
+
             //0.01초 마다 실행해야 하는 작업---------------------------------------------------
 
             //0.1초마다
             if((centi_sec_counter%10)==0){
-                if (GPIORead(PIN) == 0) {
+                if (GPIORead(시작버튼 핀) == 0) {
                 printf("client start button pressed");
                 write(ctrl_clnt_socket, "client start button pressed", strlen("client start button pressed"));
                 }
@@ -232,7 +240,7 @@
             
             //countdown이 0이면 game start
             if (!countdown) {
-                game_start = 1;
+                game_start = true;
                 printf("Game Start!\n");
             }
 
