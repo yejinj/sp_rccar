@@ -10,6 +10,8 @@
 #include <sys/types.h>
 #include <stdbool.h>
 
+#include "../touch_lcd_server.h"
+
 #define IN 0
 #define OUT 1
 
@@ -23,6 +25,10 @@
 
 bool server_ready_state = false;
 bool client_ready_state = false;
+bool stop_skill = true;
+bool chaos_skill = true;
+
+int game_start = 0;
 
 static int GPIOExport(int pin) {
 #define BUFFER_MAX 3
@@ -128,20 +134,27 @@ static int GPIOWrite(int pin, int value) {
 
 void error_handling(char *message)
 {
-	fputs(message, stderr);
-	fputc('\n', stderr);
-	exit(1);
+   fputs(message, stderr);
+   fputc('\n', stderr);
+   exit(1);
 }
 
 void* thread_input_to_rc_clnt_socket(void* arg) {
     int rc_clnt_sock = *(int*)arg;
     int centi_sec_counter = 0;
-    int countdown = 3;
 
     while (1) {
         //0.01초 마다 실행해야 하는 작업---------------------------------------------------
         if (GPIORead(PIN) == 0 ) { //조이스틱 값이 변경되었을 때
             write(rc_clnt_sock, "조이스틱 값", strlen("조이스틱 값"));
+        }
+        if(stop_skill){
+          write(rc_clnt_sock, "stop_skill", strlen("stop_skill"));
+          stop_skill = false;
+        }
+        if(chaos_skill){
+          write(rc_clnt_sock, "chaos_skill", strlen("chaos_skill"));
+          chaos_skill = false;
         }
         //0.01초 마다 실행해야 하는 작업---------------------------------------------------
 
@@ -151,12 +164,73 @@ void* thread_input_to_rc_clnt_socket(void* arg) {
         }
         //0.1초마다
 
-        //1초 마다 실행해야 하는 작업------------------------------------------------------
         if((centi_sec_counter%100)==0){
+        //1초 마다 실행해야 하는 작업------------------------------------------------------
+        if(!countdown_start){
+            countdown = 3; //카운트 다운 초기화
+        }
+        
+        else{
+            lcd_m(LINE2);
+            print_int(countdown);
+            // count down 3초 보내기          
+            // printf("Countdown: %d seconds\n", countdown);
+            countdown--;
+        }
+        
+        //countdown이 0이면 game start
+        if (!countdown) {
+            game_start = 1;
+            printf("Game Start!\n");
+        }
 
+        if (game_start) {
+            int time_limit = 120; // 2분
+            int detected = 0;
+
+            while (time_limit >= 0) {
+                lcd_m(LINE2);
+                print_int(time_limit / 60);
+                print_str("m ");
+                print_int(time_limit % 60);
+                print_str("s ");
+
+                // Check for touch sensor detection        
+                if (!digitalRead(PIR)) {       
+                    --time_limit;
+                }
+
+                else
+                {
+                    // 감지되었을 때
+                    printf("Detected\n");
+                    
+                    // Notify the client to gracefully exit
+                    write(clnt_sock, "Police win!", sizeof("Police win!"));
+
+                    lcd_m(LINE1);
+                    print_str("Police win!");
+
+                    // Close client socket and exit
+                    close(clnt_sock);
+                    close(serv_sock);
+
+                    detected = 1;
+                    exit(0);
+                }
+            }
+            
+            // Time limit 끝나도 감지되지 않았을 때
+            if (detected == 0) {
+                write(clnt_sock, "Theif win!", sizeof("Theif win!"));
+
+                lcd_m(LINE1);
+                print_str("Theif win!");
+            }
         }
         //1초 마다 실행해야 하는 작업------------------------------------------------------
-
+        }
+        
         centi_sec_counter++;
         usleep(10000); // 0.01초마다 버튼 상태 체크
     }
@@ -189,15 +263,15 @@ void* thread_input_to_ctrl_clnt_socket(void* arg) {
         if((centi_sec_counter%10)==0){
             if (GPIORead(PIN) == 0) {
               server_ready_state = !server_ready_state;
-              printf("sever button state changed: %s\n", server_ready_state ? "true" : "false");
+              printf("server button state changed: %s\n", server_ready_state ? "true" : "false");
             }
             if (GPIORead(멈춤 스킬버튼핀) == 0) {
-              printf("sever stop skill button pressed");
-              write(ctrl_clnt_sock, "sever stop skill button pressed", strlen("sever stop skill button pressed"));
+              printf("server stop skill button pressed");
+              write(ctrl_clnt_sock, "server stop skill button pressed", strlen("sever stop skill button pressed"));
             }
             if (GPIORead(카오스 스킬버튼핀) == 0) {
               printf("sever chaos skill button pressed");
-              write(ctrl_clnt_sock, "sever chaos skill button pressed", strlen("sever chaos skill button pressed"));
+              write(ctrl_clnt_sock, "server chaos skill button pressed", strlen("sever chaos skill button pressed"));
             }
         }
         //0.1초마다
@@ -210,12 +284,14 @@ void* thread_input_to_ctrl_clnt_socket(void* arg) {
                 server_ready_state ? "true" : "false",
                 client_ready_state ? "true" : "false");
           }
+          
           else{
             //count down 3초 보내기          
             write(ctrl_clnt_sock, "Countdown Start", strlen("Countdown Start"));
             printf("Countdown: %d seconds\n", countdown);
             countdown--;
           }
+
           //countdown이 0이면 game start
           if (countdown==0) {
             printf("Game Start!\n");
@@ -343,8 +419,9 @@ int main(int argc, char *argv[]) {
     pthread_join(clnt_output_thread, NULL);
 
     close(rc_clnt_sock);
-    close(ctrl_clnt_sock);	
-	  close(ctrl_serv_sock);
+    close(rc_serv_sock);
+    close(ctrl_clnt_sock);   
+     close(ctrl_serv_sock);
 
     if (GPIOUnexport(POUT) == -1 || GPIOUnexport(PIN) == -1) {
         return 4;
